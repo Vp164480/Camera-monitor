@@ -1,5 +1,6 @@
 package com.example.screens
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -21,8 +22,10 @@ fun ScannerApp(viewModel: ScannerViewModel = viewModel()) {
         composable("home") {
             HomeScreen(
                 onScanCamera = { navController.navigate("camera") },
-                onImageSelected = { uri -> viewModel.processImage(context, uri) },
-                onPdfSelected = { uri -> viewModel.processPdf(context, uri) },
+                onImageSelected = { uri -> 
+                    navController.navigate("imagePreview/${Uri.encode(uri.toString())}") 
+                },
+                onPdfSelected = { uri -> viewModel.handleIncomingDocument(context, uri, isPdf = true) },
                 onDemoSelected = { viewModel.processDemoBill() },
                 onSettings = { navController.navigate("settings") }
             )
@@ -32,9 +35,21 @@ fun ScannerApp(viewModel: ScannerViewModel = viewModel()) {
             CameraScreen(
                 onImageCaptured = { uri -> 
                     navController.popBackStack()
-                    viewModel.processImage(context, uri)
+                    navController.navigate("imagePreview/${Uri.encode(uri.toString())}")
                 },
                 onCancel = { navController.popBackStack() }
+            )
+        }
+        
+        composable("imagePreview/{uriEncoded}") { backStackEntry ->
+            val uri = Uri.parse(Uri.decode(backStackEntry.arguments?.getString("uriEncoded") ?: ""))
+            ImagePreviewScreen(
+                uri = uri,
+                onRetake = { navController.popBackStack() },
+                onScan = { 
+                    navController.popBackStack()
+                    viewModel.handleIncomingDocument(context, uri, isPdf = false) 
+                }
             )
         }
         
@@ -47,6 +62,10 @@ fun ScannerApp(viewModel: ScannerViewModel = viewModel()) {
     
     // Overlay for processing / review / error state
     when (val currentState = state) {
+        is ScannerState.ConfirmOnlineUpload -> ConfirmOnlineDialog(
+            onConfirm = { viewModel.confirmOnlineUpload(context, currentState.uri, currentState.isPdf, approved = true) },
+            onCancel = { viewModel.confirmOnlineUpload(context, currentState.uri, currentState.isPdf, approved = false) }
+        )
         is ScannerState.Processing -> ProcessingScreen(currentState.progressText)
         is ScannerState.Review -> ReviewScreen(
             result = currentState.billResult,

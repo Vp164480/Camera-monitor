@@ -3,15 +3,20 @@ package com.example.scanner
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.PreferencesManager
 import com.example.models.BillItem
 import com.example.models.BillResult
 import com.example.ocr.BillParser
+import com.example.ocr.OcrProvider
 import com.example.ocr.OfflineOcrProvider
+import com.example.ocr.OnlineOcrProvider
 import com.example.pdf.PdfProcessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +24,7 @@ import kotlinx.coroutines.launch
 
 sealed class ScannerState {
     object Idle : ScannerState()
+    data class ConfirmOnlineUpload(val uri: Uri, val isPdf: Boolean) : ScannerState()
     data class Processing(val progressText: String) : ScannerState()
     data class Review(val billResult: BillResult, val originalUris: List<Uri> = emptyList()) : ScannerState()
     data class Error(val message: String) : ScannerState()
@@ -28,7 +34,9 @@ class ScannerViewModel : ViewModel() {
     private val _state = MutableStateFlow<ScannerState>(ScannerState.Idle)
     val state = _state.asStateFlow()
     
-    private val ocrProvider = OfflineOcrProvider() // Configurable later
+    private val offlineOcrProvider = OfflineOcrProvider()
+    private val onlineOcrProvider = OnlineOcrProvider("https://api.example.com/ocr", "")
+    
     private var currentBillResult: BillResult? = null
 
     fun reset() {
@@ -36,18 +44,69 @@ class ScannerViewModel : ViewModel() {
         currentBillResult = null
     }
 
-    fun processImage(context: Context, uri: Uri) {
+    private fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val actNw = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return when {
+            actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+            actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+            actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+            else -> false
+        }
+    }
+
+    fun handleIncomingDocument(context: Context, uri: Uri, isPdf: Boolean) {
+        val mode = PreferencesManager.getOcrMode(context)
+        val hasNet = isNetworkAvailable(context)
+        
+        when (mode) {
+            "Offline Only" -> {
+                executeProcessing(context, uri, isPdf, offlineOcrProvider)
+            }
+            "Online OCR" -> {
+                _state.value = ScannerState.ConfirmOnlineUpload(uri, isPdf)
+            }
+            "Automatic" -> {
+                if (hasNet) {
+                    _state.value = ScannerState.ConfirmOnlineUpload(uri, isPdf)
+                } else {
+                    executeProcessing(context, uri, isPdf, offlineOcrProvider)
+                }
+            }
+            else -> executeProcessing(context, uri, isPdf, offlineOcrProvider)
+        }
+    }
+
+    fun confirmOnlineUpload(context: Context, uri: Uri, isPdf: Boolean, approved: Boolean) {
+        if (approved) {
+            executeProcessing(context, uri, isPdf, onlineOcrProvider)
+        } else {
+            // Fallback to offline if they cancel online
+            executeProcessing(context, uri, isPdf, offlineOcrProvider)
+        }
+    }
+
+    private fun executeProcessing(context: Context, uri: Uri, isPdf: Boolean, ocrProvider: OcrProvider) {
+        if (isPdf) {
+            processPdf(context, uri, ocrProvider)
+        } else {
+            processImage(context, uri, ocrProvider)
+        }
+    }
+
+    private fun processImage(context: Context, uri: Uri, ocrProvider: OcrProvider) {
         viewModelScope.launch {
             _state.value = ScannerState.Processing("Processing image...")
             try {
                 val bitmap = uriToBitmap(context, uri)
                 if (bitmap != null) {
-                    val rawText = ocrProvider.processImage(bitmap)
-                    if (rawText.isBlank()) {
+                    val ocrResult = ocrProvider.processImage(bitmap)
+                    if (ocrResult.text.isBlank()) {
                         _state.value = ScannerState.Error("No readable text detected. Try a clearer photo.")
                         return@launch
                     }
-                    val result = BillParser.parse(rawText)
+                    val result = BillParser.parse(ocrResult.text, ocrResult.source)
                     currentBillResult = result
                     _state.value = ScannerState.Review(result, listOf(uri))
                 } else {
@@ -59,20 +118,20 @@ class ScannerViewModel : ViewModel() {
         }
     }
 
-    fun processPdf(context: Context, uri: Uri) {
+    private fun processPdf(context: Context, uri: Uri, ocrProvider: OcrProvider) {
         viewModelScope.launch {
             try {
                 _state.value = ScannerState.Processing("Loading PDF...")
-                val allText = PdfProcessor.processPdfWithOcr(context, uri, ocrProvider) { current, total ->
+                val ocrResult = PdfProcessor.processPdfWithOcr(context, uri, ocrProvider) { current, total ->
                     _state.value = ScannerState.Processing("Processing page $current of $total...")
                 }
                 
-                if (allText.isBlank()) {
+                if (ocrResult.text.isBlank()) {
                     _state.value = ScannerState.Error("Could not read PDF or PDF is empty.")
                     return@launch
                 }
                 
-                val result = BillParser.parse(allText)
+                val result = BillParser.parse(ocrResult.text, ocrResult.source)
                 currentBillResult = result
                 _state.value = ScannerState.Review(result, listOf(uri))
             } catch (e: Exception) {
@@ -93,7 +152,7 @@ class ScannerViewModel : ViewModel() {
                 Total ₹1800
             """.trimIndent()
             
-            val result = BillParser.parse(demoText)
+            val result = BillParser.parse(demoText, "demo")
             currentBillResult = result
             _state.value = ScannerState.Review(result, emptyList())
         }

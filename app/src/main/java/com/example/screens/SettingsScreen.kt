@@ -7,14 +7,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.PreferencesManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    var ocrMode by remember { mutableStateOf("Offline Only") }
+    val context = LocalContext.current
+    var ocrMode by remember { mutableStateOf(PreferencesManager.getOcrMode(context)) }
     
     Scaffold(
         topBar = {
@@ -37,7 +40,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             Text("OCR Mode", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(8.dp))
             
-            val modes = listOf("Automatic", "Offline Only", "Online Only")
+            val modes = listOf("Automatic", "Offline Only", "Online OCR")
             modes.forEach { mode ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -45,7 +48,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ) {
                     RadioButton(
                         selected = (ocrMode == mode),
-                        onClick = { ocrMode = mode }
+                        onClick = { 
+                            ocrMode = mode
+                            PreferencesManager.setOcrMode(context, mode)
+                        }
                     )
                     Text(text = mode, modifier = Modifier.padding(start = 8.dp))
                 }
@@ -75,7 +81,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "⚠️ Warning: Production API keys should normally be protected by a backend server proxy.",
+                "⚠️ Warning: Production API keys should normally be protected by a backend server proxy and should not be exposed in a client APK.",
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )

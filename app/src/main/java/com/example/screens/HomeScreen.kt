@@ -58,6 +58,12 @@ fun HomeScreen(
                 "Scan or Upload Document",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Text(
+                "Handwriting recognition may require manual correction.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 

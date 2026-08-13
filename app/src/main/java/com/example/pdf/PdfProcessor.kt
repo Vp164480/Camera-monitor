@@ -9,12 +9,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import com.example.ocr.OcrProvider
+import com.example.ocr.OcrResult
 
 object PdfProcessor {
-    suspend fun processPdfWithOcr(context: Context, uri: Uri, ocrProvider: OcrProvider, onProgress: (Int, Int) -> Unit): String = withContext(Dispatchers.IO) {
+    suspend fun processPdfWithOcr(context: Context, uri: Uri, ocrProvider: OcrProvider, onProgress: (Int, Int) -> Unit): OcrResult = withContext(Dispatchers.IO) {
         val allText = StringBuilder()
         var fileDescriptor: ParcelFileDescriptor? = null
         var renderer: PdfRenderer? = null
+        var lastSource = ""
+        var lastInfo = ""
         try {
             val tempFile = File(context.cacheDir, "temp_pdf_${System.currentTimeMillis()}.pdf")
             context.contentResolver.openInputStream(uri)?.use { input ->
@@ -40,8 +43,10 @@ object PdfProcessor {
                 bitmap.eraseColor(android.graphics.Color.WHITE)
                 
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                val text = ocrProvider.processImage(bitmap)
-                allText.append(text).append("\n")
+                val result = ocrProvider.processImage(bitmap)
+                allText.append(result.text).append("\n")
+                lastSource = result.source
+                lastInfo = result.processingInformation
                 bitmap.recycle()
                 page.close()
             }
@@ -53,6 +58,11 @@ object PdfProcessor {
             renderer?.close()
             fileDescriptor?.close()
         }
-        return@withContext allText.toString()
+        return@withContext OcrResult(
+            text = allText.toString(),
+            confidence = null, // Hard to aggregate confidence across pages cleanly for now
+            source = lastSource.ifEmpty { "offline-ocr" },
+            processingInformation = lastInfo.ifEmpty { "Processed PDF pages" }
+        )
     }
 }

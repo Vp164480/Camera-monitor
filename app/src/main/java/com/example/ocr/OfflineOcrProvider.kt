@@ -7,17 +7,26 @@ import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 import kotlinx.coroutines.tasks.await
 
 class OfflineOcrProvider : OcrProvider {
-    // Supports English and Devanagari (Hindi)
     private val recognizer = TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().build())
 
-    override suspend fun processImage(bitmap: Bitmap): String {
+    override suspend fun processImage(bitmap: Bitmap): OcrResult {
         return try {
             val image = InputImage.fromBitmap(bitmap, 0)
             val result = recognizer.process(image).await()
-            result.text
+            OcrResult(
+                text = result.text,
+                confidence = null, 
+                source = "offline-ocr",
+                processingInformation = "ML Kit Devanagari offline engine"
+            )
         } catch (e: Exception) {
             e.printStackTrace()
-            ""
+            OcrResult(
+                text = "",
+                confidence = null,
+                source = "offline-ocr",
+                processingInformation = "Failed: ${e.message}"
+            )
         }
     }
 }

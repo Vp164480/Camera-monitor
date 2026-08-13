@@ -1,0 +1,6 @@
+{
+  "name": "Mahadev Bill Scanner",
+  "description": "Bill Scanner & OCR module for MAHADEV AUTO GARAGE inventory and billing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

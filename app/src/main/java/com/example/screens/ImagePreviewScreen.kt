@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,7 +52,7 @@ fun ImagePreviewScreen(
                         Icon(Icons.Default.CameraAlt, contentDescription = "Retake")
                     }
                     IconButton(onClick = { /* Rotate */ }) {
-                        Icon(Icons.Default.RotateRight, contentDescription = "Rotate")
+                        Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = "Rotate")
                     }
                     IconButton(onClick = { /* Crop */ }) {
                         Icon(Icons.Default.Crop, contentDescription = "Crop")
@@ -77,8 +78,12 @@ fun ImagePreviewScreen(
                 contentAlignment = Alignment.Center
             ) {
                 // Using Coil for image display
+                val context = androidx.compose.ui.platform.LocalContext.current
                 AsyncImage(
-                    model = uri,
+                    model = coil.request.ImageRequest.Builder(context)
+                        .data(uri)
+                        .allowHardware(false)
+                        .build(),
                     contentDescription = "Document Preview",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()

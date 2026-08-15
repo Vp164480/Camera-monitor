@@ -22,17 +22,23 @@ import androidx.compose.ui.unit.sp
 import com.example.models.BillItem
 import com.example.models.BillResult
 import com.example.scanner.ScannerViewModel
+import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewScreen(
     result: BillResult,
+    originalUris: List<Uri>,
     viewModel: ScannerViewModel,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onRescan: () -> Unit
 ) {
     var showRawText by remember { mutableStateOf(false) }
     var customerName by remember { mutableStateOf("") }
     var customerPhone by remember { mutableStateOf("") }
+    var vehicleNumber by remember { mutableStateOf("") }
+    var vehicleModel by remember { mutableStateOf("") }
+    var showOriginalImage by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -56,7 +62,7 @@ fun ReviewScreen(
                     onClick = { /* In real app, passes data back */ },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 ) {
-                    Text("Save Bill (₹${result.calculatedTotal})")
+                    Text("Create Customer Bill (₹${result.calculatedTotal})")
                 }
             }
         }
@@ -106,22 +112,7 @@ fun ReviewScreen(
                         }
                     }
                     
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Customer Information", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    OutlinedTextField(
-                        value = customerName,
-                        onValueChange = { customerName = it },
-                        label = { Text("Customer Name") },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    )
-                    OutlinedTextField(
-                        value = customerPhone,
-                        onValueChange = { customerPhone = it },
-                        label = { Text("Phone Number") },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -144,23 +135,8 @@ fun ReviewScreen(
 
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
-                    Divider()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Customer Information", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    OutlinedTextField(
-                        value = customerName,
-                        onValueChange = { customerName = it },
-                        label = { Text("Customer Name") },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    )
-                    OutlinedTextField(
-                        value = customerPhone,
-                        onValueChange = { customerPhone = it },
-                        label = { Text("Phone Number") },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
                     
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Subtotal:", fontWeight = FontWeight.Bold)
@@ -197,10 +173,28 @@ fun ReviewScreen(
             }
         }
     }
-}
 
+    if (showOriginalImage && originalUris.isNotEmpty()) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showOriginalImage = false }) {
+            Box(modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha=0.8f)).padding(16.dp)) {
+                coil.compose.AsyncImage(
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(originalUris.first())
+                        .allowHardware(false)
+                        .build(),
+                    contentDescription = "Original",
+                    modifier = Modifier.fillMaxSize()
+                )
+                IconButton(onClick = { showOriginalImage = false }, modifier = Modifier.align(Alignment.TopEnd)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = androidx.compose.ui.graphics.Color.White)
+                }
+            }
+        }
+    }
+}
 @Composable
 fun BillItemRow(
+
     item: BillItem,
     onUpdate: (BillItem) -> Unit,
     onDelete: (BillItem) -> Unit

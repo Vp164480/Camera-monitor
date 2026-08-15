@@ -69,8 +69,10 @@ fun ScannerApp(viewModel: ScannerViewModel = viewModel()) {
         is ScannerState.Processing -> ProcessingScreen(currentState.progressText)
         is ScannerState.Review -> ReviewScreen(
             result = currentState.billResult,
+            originalUris = currentState.originalUris,
             viewModel = viewModel,
-            onClose = { viewModel.reset() }
+            onClose = { viewModel.reset() },
+            onRescan = { viewModel.reset() }
         )
         is ScannerState.Error -> ErrorScreen(
             message = currentState.message,

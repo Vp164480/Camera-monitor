@@ -145,11 +145,11 @@ class ScannerViewModel : ViewModel() {
             _state.value = ScannerState.Processing("Loading Demo Bill...")
             val demoText = """
                 Mahadev Auto Garage
-                इंजन ऑयल 2 450
-                Brake Shoe 1 ₹280
-                एयर फिल्टर 2 Rs 150
-                Spark Plug 4 80
-                Total ₹1800
+                Engine Oil 2 450
+                Brake Shoe 1 280
+                Air Filter 2 150
+                Spark Plug 3 90
+                Total 1450
             """.trimIndent()
             
             val result = BillParser.parse(demoText, "demo")
@@ -161,7 +161,8 @@ class ScannerViewModel : ViewModel() {
     fun updateItem(updatedItem: BillItem) {
         val current = currentBillResult ?: return
         val newItems = current.items.map { if (it.id == updatedItem.id) updatedItem else it }
-        val newResult = current.copy(items = newItems)
+        val newSubtotal = newItems.sumOf { it.amount }
+        val newResult = current.copy(items = newItems, subtotal = newSubtotal)
         currentBillResult = newResult
         _state.value = ScannerState.Review(newResult)
     }
@@ -169,7 +170,8 @@ class ScannerViewModel : ViewModel() {
     fun deleteItem(item: BillItem) {
         val current = currentBillResult ?: return
         val newItems = current.items.filter { it.id != item.id }
-        val newResult = current.copy(items = newItems)
+        val newSubtotal = newItems.sumOf { it.amount }
+        val newResult = current.copy(items = newItems, subtotal = newSubtotal)
         currentBillResult = newResult
         _state.value = ScannerState.Review(newResult)
     }
@@ -178,7 +180,8 @@ class ScannerViewModel : ViewModel() {
         val current = currentBillResult ?: return
         val newItems = current.items.toMutableList()
         newItems.add(BillItem(productName = "New Item", quantity = 1, price = 0.0))
-        val newResult = current.copy(items = newItems)
+        val newSubtotal = newItems.sumOf { it.amount }
+        val newResult = current.copy(items = newItems, subtotal = newSubtotal)
         currentBillResult = newResult
         _state.value = ScannerState.Review(newResult)
     }
